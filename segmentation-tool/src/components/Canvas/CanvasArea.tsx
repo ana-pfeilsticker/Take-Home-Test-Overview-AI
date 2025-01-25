@@ -101,7 +101,7 @@ const CanvasArea: React.FC = () => {
 		<div
 			style={{
 				height: "60%",
-				width: "90%",
+				width: "100%",
 				borderRadius: "20px",
 			}}
 		>

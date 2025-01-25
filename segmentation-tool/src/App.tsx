@@ -4,6 +4,7 @@ import Sider from "antd/es/layout/Sider";
 import theme from "./styles/theme";
 import ClassesPanel from "./components/ClassesPanel/ClassesPanel";
 import CanvasArea from "./components/Canvas/CanvasArea";
+import ToolBar from "./components/Toolbar/Toobar";
 
 function App() {
 	return (
@@ -32,21 +33,32 @@ function App() {
 							flexGrow: 1,
 							gap: "25px",
 							display: "flex",
-							flexDirection: "column",
 						}}
 					>
-						<CanvasArea />
 						<div
 							style={{
-								height: "40%",
-								width: "90%",
-								backgroundColor: theme.lightBackgroundColor,
-								borderRadius: "20px",
-								padding: "20px",
+								height: "100%",
+								width: "100%",
+								display: "flex",
+								flexDirection: "column",
+								gap: "25px",
 							}}
 						>
-							Preview
+							<CanvasArea />
+							<div
+								style={{
+									height: "40%",
+									width: "100%",
+									backgroundColor: theme.lightBackgroundColor,
+									borderRadius: "20px",
+									padding: "20px",
+								}}
+							>
+								Preview
+							</div>
 						</div>
+
+						<ToolBar />
 					</Content>
 				</Layout>
 			</AntdApp>
