@@ -6,6 +6,7 @@ const theme = {
 	successColor: "#52C41A",
 	backgroundColor: "#FBFBFB",
 	lightBackgroundColor: "#F1F1F1",
+	fontFamily: "'Montserrat', sans-serif",
 };
 
 export default theme;

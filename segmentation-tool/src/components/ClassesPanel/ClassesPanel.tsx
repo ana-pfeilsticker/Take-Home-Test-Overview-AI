@@ -72,15 +72,15 @@ function ClassesPanel() {
 							alignItems: "center",
 							marginBottom: "10px",
 							gap: "10px",
-							minHeight: "42px",
+							minHeight: "38px",
 							background: theme.backgroundColor,
 							borderRadius: "10px",
 						}}
 					>
 						<div
 							style={{
-								width: "15px",
-								height: "42px",
+								width: "10px",
+								height: "38px",
 								backgroundColor: item.color,
 								borderRadius: "10px 0px 0px 10px",
 							}}
