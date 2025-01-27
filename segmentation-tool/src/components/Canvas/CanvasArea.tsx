@@ -7,14 +7,19 @@ import theme from "../../styles/theme";
 const CanvasArea: React.FC = () => {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
+	const undoStack = useRef<string[]>([]); // Pilha de estados para undo
 	const [isImageUploaded, setIsImageUploaded] = useState(false);
+	const [brushColor, setBrushColor] = useState("#FF0000");
+	const [brushWidth, setBrushWidth] = useState(5);
+	const [isBrushing, setIsBrushing] = useState(true);
 
 	useEffect(() => {
 		if (!canvasRef.current) {
-			console.error("Canvas HTML element não encontrado!");
+			console.error("Elemento HTML Canvas não encontrado!");
 			return;
 		}
 
+		// Inicializar o canvas com Fabric.js
 		const canvas = new fabric.Canvas(canvasRef.current, {
 			isDrawingMode: true,
 			selection: false,
@@ -22,6 +27,12 @@ const CanvasArea: React.FC = () => {
 
 		fabricCanvasRef.current = canvas;
 
+		// Configurar o pincel inicial
+		canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
+		canvas.freeDrawingBrush.color = brushColor;
+		canvas.freeDrawingBrush.width = brushWidth;
+
+		// Redimensionar o canvas ao montar e ao redimensionar a janela
 		const resizeCanvas = () => {
 			const parent = canvasRef.current!.parentElement!;
 			canvas.setWidth(parent.offsetWidth);
@@ -29,7 +40,6 @@ const CanvasArea: React.FC = () => {
 			canvas.renderAll();
 		};
 
-		// Redimensiona o canvas ao montar e ao redimensionar a janela
 		resizeCanvas();
 		window.addEventListener("resize", resizeCanvas);
 
@@ -38,6 +48,44 @@ const CanvasArea: React.FC = () => {
 			canvas.dispose();
 		};
 	}, []);
+
+	useEffect(() => {
+		if (fabricCanvasRef.current) {
+			const canvas = fabricCanvasRef.current;
+			if (canvas.freeDrawingBrush) {
+				canvas.freeDrawingBrush.color = brushColor;
+				canvas.freeDrawingBrush.width = brushWidth;
+			}
+		}
+	}, [brushColor, brushWidth]);
+
+	const saveState = () => {
+		if (fabricCanvasRef.current) {
+			const canvas = fabricCanvasRef.current;
+
+			// Salva o estado atual como JSON
+			const state = JSON.stringify(canvas.toJSON());
+			undoStack.current.push(state); // Adiciona ao stack
+			console.log("Estado salvo:", undoStack.current);
+		}
+	};
+
+	const undo = () => {
+		if (fabricCanvasRef.current && undoStack.current.length > 1) {
+			const canvas = fabricCanvasRef.current;
+
+			// Remove o estado atual do stack e carrega o estado anterior
+			undoStack.current.pop();
+			const previousState = undoStack.current[undoStack.current.length - 1];
+
+			canvas.loadFromJSON(previousState, () => {
+				canvas.renderAll();
+				console.log("Desfeito para o estado anterior.");
+			});
+		} else {
+			message.warning("Nada para desfazer.");
+		}
+	};
 
 	const handleImageUpload = (file: File) => {
 		const reader = new FileReader();
@@ -55,30 +103,29 @@ const CanvasArea: React.FC = () => {
 
 			imgElement.onload = () => {
 				const img = new fabric.Image(imgElement, {
-					selectable: false, // Desabilita a seleção, se necessário
+					selectable: false, // A imagem não pode ser selecionada
 				});
 
 				const canvas = fabricCanvasRef.current!;
 				const canvasWidth = canvas.getWidth();
 				const canvasHeight = canvas.getHeight();
 
-				// Ajustar a escala para ocupar 100% do canvas
+				// Escalar a imagem para caber no canvas
 				const scaleX = canvasWidth / img.width!;
 				const scaleY = canvasHeight / img.height!;
-				const scale = Math.max(scaleX, scaleY); // Usa a maior escala para cobrir totalmente o canvas
+				const scale = Math.max(scaleX, scaleY);
 
 				img.scale(scale);
-
-				// Centralizar a imagem no canvas
 				img.set({
 					left: (canvasWidth - img.width! * scale) / 2,
 					top: (canvasHeight - img.height! * scale) / 2,
 				});
 
-				canvas.add(img);
+				canvas.add(img); // Adiciona a imagem ao canvas
 				canvas.renderAll();
-				console.log("Imagem ajustada para ocupar 100% do canvas.");
+
 				setIsImageUploaded(true);
+				saveState(); // Salva o estado inicial com a imagem
 				message.success("Imagem carregada com sucesso!");
 			};
 
@@ -94,7 +141,15 @@ const CanvasArea: React.FC = () => {
 		};
 
 		reader.readAsDataURL(file);
-		return false;
+		return false; // Evita o comportamento padrão de upload
+	};
+
+	const toggleBrushing = () => {
+		if (fabricCanvasRef.current) {
+			const canvas = fabricCanvasRef.current;
+			canvas.isDrawingMode = !canvas.isDrawingMode; // Alterna o modo de desenho
+			setIsBrushing(canvas.isDrawingMode);
+		}
 	};
 
 	return (
@@ -151,12 +206,34 @@ const CanvasArea: React.FC = () => {
 				)}
 				<canvas
 					ref={canvasRef}
+					height={600}
+					width={800}
 					style={{
 						width: "100%",
 						height: "100%",
 						display: "block",
 					}}
 				/>
+				<div style={{ marginTop: "10px" }}>
+					<input
+						type="color"
+						value={brushColor}
+						onChange={(e) => setBrushColor(e.target.value)}
+					/>
+					<input
+						type="range"
+						min={1}
+						max={50}
+						value={brushWidth}
+						onChange={(e) => setBrushWidth(Number(e.target.value))}
+					/>
+					<button onClick={toggleBrushing}>
+						{isBrushing ? "Disable Brush" : "Enable Brush"}
+					</button>
+					<button onClick={undo} style={{ marginLeft: "10px" }}>
+						Undo
+					</button>
+				</div>
 			</div>
 		</div>
 	);
