@@ -17,23 +17,23 @@ const CanvasArea: React.FC = () => {
 	const [brushColor, setBrushColor] = useState("#FF0000");
 	const [brushWidth, setBrushWidth] = useState(5);
 
-	// Modo brush e modo polígono
+	// Modo brush, polígono e borracha
 	const [isBrushing, setIsBrushing] = useState(true);
 	const [isPolygonMode, setIsPolygonMode] = useState(false);
+	const [isEraserMode, setIsEraserMode] = useState(false);
 
-	// Estados/Referências para POLÍGONO
+	// Refs para o Polígono
 	const pointArray = useRef<fabric.Circle[]>([]);
 	const lineArray = useRef<fabric.Line[]>([]);
 	const activeLine = useRef<fabric.Line | null>(null);
 	const activeShape = useRef<fabric.Polygon | null>(null);
 
-	// NOVO: estado para BORRACHA
-	const [isEraserMode, setIsEraserMode] = useState(false);
-
+	//----------------------------------------------------------------
+	// 1) Inicialização do Canvas (roda só quando a imagem é carregada)
+	//----------------------------------------------------------------
 	useEffect(() => {
 		if (!canvasRef.current || !isImageUploaded) return;
 
-		// Só inicializa o canvas 1x quando a imagem for carregada
 		const canvasDiv = document.getElementById("canvas-div");
 		if (!canvasDiv) {
 			console.error("Elemento canvas-div não encontrado!");
@@ -43,7 +43,6 @@ const CanvasArea: React.FC = () => {
 		const width = canvasDiv.clientWidth;
 		const height = canvasDiv.clientHeight;
 
-		// Cria o canvas
 		const canvas = new fabric.Canvas(canvasRef.current, {
 			isDrawingMode: true,
 			selection: false,
@@ -53,7 +52,7 @@ const CanvasArea: React.FC = () => {
 		});
 		fabricCanvasRef.current = canvas;
 
-		// Configurar o brush inicialmente
+		// Configurar o brush
 		canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
 		canvas.freeDrawingBrush.color = brushColor;
 		canvas.freeDrawingBrush.width = brushWidth;
@@ -67,7 +66,7 @@ const CanvasArea: React.FC = () => {
 			});
 		}
 
-		// Listener para salvar state em Undo
+		// Salvar estado em Undo
 		const saveState = () => {
 			const currentState = JSON.stringify(canvas.toJSON());
 			if (
@@ -81,15 +80,15 @@ const CanvasArea: React.FC = () => {
 		canvas.on("object:modified", saveState);
 		canvas.on("path:created", saveState);
 
-		// Cleanup ao desmontar
+		// Cleanup
 		return () => {
 			canvas.dispose();
 		};
 	}, [isImageUploaded]);
 
-	/**
-	 * useEffect para "escutar" mudanças no Brush (cor, largura).
-	 */
+	//----------------------------------------------------------------
+	// 2) Atualiza cor e largura do brush sempre que mudarem no state
+	//----------------------------------------------------------------
 	useEffect(() => {
 		const canvas = fabricCanvasRef.current;
 		if (!canvas) return;
@@ -100,44 +99,198 @@ const CanvasArea: React.FC = () => {
 		}
 	}, [brushColor, brushWidth]);
 
-	/**
-	 * useEffect para controle de modo polígono:
-	 * - se entrar em modo polígono, desativa isDrawingMode e anexa listener.
-	 * - se sair do modo polígono, reativa brush e remove listener. Cancela polígonos inacabados.
-	 */
+	//----------------------------------------------------------------
+	// 3) MODO POLÍGONO: define localmente a função e faz cleanup
+	//----------------------------------------------------------------
 	useEffect(() => {
 		const canvas = fabricCanvasRef.current;
 		if (!canvas) return;
 
 		if (isPolygonMode) {
-			// Desativar brush e remover listener do Eraser
+			// Desativa brush e Eraser
 			canvas.isDrawingMode = false;
-			canvas.off("mouse:down", handleEraserClick);
+			// Se quiser remover qualquer listener local de eraser
+			// mas aqui, se tiver, a gente pode remover
 
-			// Ativar listener para polígono
-			canvas.on("mouse:down", handleCanvasClickForPolygon);
-		} else {
-			// Sair do modo polígono
+			// Limpamos polygon inacabado (se quiser) OU deixamos
+			// Se você quiser sempre que ative polígono, comece limpo
 			cancelPolygonDrawing();
-			// Se não estiver em eraser, reativa ou não o brush
-			if (!isEraserMode) {
-				canvas.isDrawingMode = true;
-			}
-			canvas.off("mouse:down", handleCanvasClickForPolygon);
-		}
-	}, [isPolygonMode]);
 
-	/**
-	 * useEffect para controle do modo Eraser:
-	 * - se entrar em modo eraser, remove brush e polígono, e anexa listener de clique que remove objeto.
-	 * - se sair, remove o listener e volta ao estado anterior (brush ou polígono).
-	 */
+			/**
+			 * Função local para clique do polígono
+			 */
+			function handlePolygonLocal(options: fabric.IEvent<MouseEvent>) {
+				if (!canvas) return;
+
+				const pointer = canvas.getPointer(options.e);
+				const zoom = canvas.getZoom();
+
+				// Verifica se clicamos próximo do primeiro ponto
+				if (pointArray.current.length > 0) {
+					const firstCircle = pointArray.current[0];
+					const dx = (firstCircle.left ?? 0) - pointer.x / zoom;
+					const dy = (firstCircle.top ?? 0) - pointer.y / zoom;
+					const distance = Math.sqrt(dx * dx + dy * dy);
+
+					if (distance < 10) {
+						finalizePolygonLocal();
+						return;
+					}
+				}
+
+				// Cria um círculo (ponto)
+				const circle = new fabric.Circle({
+					radius: 5,
+					fill: pointArray.current.length === 0 ? "red" : "#ffffff",
+					stroke: "#333333",
+					strokeWidth: 0.5,
+					left: pointer.x / zoom,
+					top: pointer.y / zoom,
+					selectable: false,
+					hasBorders: false,
+					hasControls: false,
+					originX: "center",
+					originY: "center",
+				});
+
+				// Linha que liga ao ponto anterior
+				const line = new fabric.Line(
+					[
+						pointer.x / zoom,
+						pointer.y / zoom,
+						pointer.x / zoom,
+						pointer.y / zoom,
+					],
+					{
+						strokeWidth: 2,
+						stroke: "#999999",
+						selectable: false,
+						hasBorders: false,
+						hasControls: false,
+						evented: false,
+					}
+				);
+
+				// Se já existe um polígono temporário
+				if (activeShape.current) {
+					const pos = canvas.getPointer(options.e);
+					const polyPoints = activeShape.current.get("points") || [];
+					polyPoints.push({ x: pos.x, y: pos.y });
+
+					const newPolygon = new fabric.Polygon(polyPoints, {
+						stroke: "#333",
+						strokeWidth: 1,
+						fill: "#cccccc",
+						opacity: 0.2,
+						selectable: false,
+						hasBorders: false,
+						hasControls: false,
+						evented: false,
+					});
+					canvas.remove(activeShape.current);
+					canvas.add(newPolygon);
+					activeShape.current = newPolygon;
+					canvas.renderAll();
+				} else {
+					// Primeiro polígono “temporário”
+					const polyPoint = [{ x: pointer.x, y: pointer.y }];
+					const polygon = new fabric.Polygon(polyPoint, {
+						stroke: "#333",
+						strokeWidth: 1,
+						fill: "#cccccc",
+						opacity: 0.2,
+						selectable: false,
+						hasBorders: false,
+						hasControls: false,
+						evented: false,
+					});
+					activeShape.current = polygon;
+					canvas.add(polygon);
+				}
+
+				activeLine.current = line;
+				pointArray.current.push(circle);
+				lineArray.current.push(line);
+
+				canvas.add(line);
+				canvas.add(circle);
+				canvas.selection = false;
+			}
+
+			/**
+			 * Função local para finalizar o polígono
+			 */
+			function finalizePolygonLocal() {
+				if (!activeShape.current) return;
+
+				const polyPoints = (activeShape.current.get("points") || []).map(
+					(p) => ({
+						x: p.x,
+						y: p.y,
+					})
+				);
+
+				// Remove pontos e linhas temporárias
+				pointArray.current.forEach((c) => canvas.remove(c));
+				lineArray.current.forEach((l) => canvas.remove(l));
+				if (activeLine.current) {
+					canvas.remove(activeLine.current);
+					activeLine.current = null;
+				}
+				canvas.remove(activeShape.current);
+
+				// Cria polígono final
+				const polygon = new fabric.Polygon(polyPoints, {
+					stroke: "#333333",
+					strokeWidth: 1,
+					fill: brushColor,
+					opacity: 1,
+					selectable: true,
+					hasBorders: true,
+					hasControls: true,
+					evented: true,
+				});
+				canvas.add(polygon);
+
+				activeShape.current = null;
+				pointArray.current = [];
+				lineArray.current = [];
+
+				canvas.selection = true;
+				saveStateManualmente();
+				message.success("Polígono finalizado!");
+			}
+
+			// Anexa o listener local
+			canvas.on("mouse:down", handlePolygonLocal);
+
+			// Cleanup: remove listener e, se quiser, faz algo mais
+			return () => {
+				canvas.off("mouse:down", handlePolygonLocal);
+				// Se desativar polígono, cancela shape inacabado
+				cancelPolygonDrawing();
+			};
+		} else {
+			// Se não estiver no modo polígono, pode reativar brush?
+			if (!isEraserMode) {
+				canvas.isDrawingMode = isBrushing;
+			}
+		}
+	}, [isPolygonMode, isBrushing, isEraserMode, brushColor]);
+
+	//----------------------------------------------------------------
+	// 4) MODO BORRACHA: define localmente a função e faz cleanup
+	//----------------------------------------------------------------
 	useEffect(() => {
 		const canvas = fabricCanvasRef.current;
 		if (!canvas) return;
 
 		if (isEraserMode) {
-			const handleEraserClickLocal = (options: fabric.IEvent<MouseEvent>) => {
+			// Desligar brush e polígono
+			canvas.isDrawingMode = false;
+			cancelPolygonDrawing();
+
+			function handleEraserLocal(options: fabric.IEvent<MouseEvent>) {
 				if (!canvas) return;
 				const target = options.target;
 				if (target) {
@@ -146,163 +299,29 @@ const CanvasArea: React.FC = () => {
 					canvas.requestRenderAll();
 					saveStateManualmente();
 				}
-			};
+			}
 
-			// Adiciona ao entrar no modo eraser
-			canvas.on("mouse:down", handleEraserClickLocal);
+			canvas.on("mouse:down", handleEraserLocal);
 
-			// Remove automaticamente ao sair do modo eraser
 			return () => {
-				canvas.off("mouse:down", handleEraserClickLocal);
+				canvas.off("mouse:down", handleEraserLocal);
 			};
-		}
-	}, [isEraserMode]);
-
-	/**
-	 * Handler de clique no modo polígono
-	 */
-	const handleCanvasClickForPolygon = (options: fabric.IEvent<MouseEvent>) => {
-		const canvas = fabricCanvasRef.current;
-		if (!canvas) return;
-
-		const pointer = canvas.getPointer(options.e);
-		const zoom = canvas.getZoom();
-
-		// Verifica se clicamos próximo do primeiro ponto para fechar o polígono
-		if (pointArray.current.length > 0) {
-			const firstCircle = pointArray.current[0];
-			const dx = (firstCircle.left ?? 0) - pointer.x / zoom;
-			const dy = (firstCircle.top ?? 0) - pointer.y / zoom;
-			const distance = Math.sqrt(dx * dx + dy * dy);
-
-			if (distance < 10) {
-				finalizePolygon();
-				return;
-			}
-		}
-
-		// Cria um círculo (ponto)
-		const circle = new fabric.Circle({
-			radius: 5,
-			fill: pointArray.current.length === 0 ? "red" : "#ffffff",
-			stroke: "#333333",
-			strokeWidth: 0.5,
-			left: pointer.x / zoom,
-			top: pointer.y / zoom,
-			selectable: false,
-			hasBorders: false,
-			hasControls: false,
-			originX: "center",
-			originY: "center",
-		});
-
-		// Cria a linha que liga ao ponto anterior
-		const line = new fabric.Line(
-			[pointer.x / zoom, pointer.y / zoom, pointer.x / zoom, pointer.y / zoom],
-			{
-				strokeWidth: 2,
-				stroke: "#999999",
-				selectable: false,
-				hasBorders: false,
-				hasControls: false,
-				evented: false,
-			}
-		);
-
-		// Se já existe um polígono temporário
-		if (activeShape.current) {
-			const pos = canvas.getPointer(options.e);
-			const polyPoints = activeShape.current.get("points") || [];
-			polyPoints.push({ x: pos.x, y: pos.y });
-
-			const newPolygon = new fabric.Polygon(polyPoints, {
-				stroke: "#333",
-				strokeWidth: 1,
-				fill: "#cccccc",
-				opacity: 0.2,
-				selectable: false,
-				hasBorders: false,
-				hasControls: false,
-				evented: false,
-			});
-			canvas.remove(activeShape.current);
-			canvas.add(newPolygon);
-			activeShape.current = newPolygon;
-			canvas.renderAll();
 		} else {
-			// Cria o primeiro polígono “temporário”
-			const polyPoint = [{ x: pointer.x, y: pointer.y }];
-			const polygon = new fabric.Polygon(polyPoint, {
-				stroke: "#333",
-				strokeWidth: 1,
-				fill: "#cccccc",
-				opacity: 0.2,
-				selectable: false,
-				hasBorders: false,
-				hasControls: false,
-				evented: false,
-			});
-			activeShape.current = polygon;
-			canvas.add(polygon);
+			// Se sair do modo borracha, volta ao brush/polygon?
+			if (!isPolygonMode) {
+				canvas.isDrawingMode = isBrushing;
+			}
 		}
+	}, [isEraserMode, isPolygonMode, isBrushing]);
 
-		activeLine.current = line;
-		pointArray.current.push(circle);
-		lineArray.current.push(line);
-
-		canvas.add(line);
-		canvas.add(circle);
-		canvas.selection = false;
-	};
-
-	/**
-	 * Finaliza o polígono
-	 */
-	const finalizePolygon = () => {
-		const canvas = fabricCanvasRef.current;
-		if (!canvas || !activeShape.current) return;
-
-		const polyPoints = (activeShape.current.get("points") || []).map((p) => ({
-			x: p.x,
-			y: p.y,
-		}));
-
-		// Remove pontos e linhas temporárias
-		pointArray.current.forEach((c) => canvas.remove(c));
-		lineArray.current.forEach((l) => canvas.remove(l));
-		if (activeLine.current) {
-			canvas.remove(activeLine.current);
-			activeLine.current = null;
-		}
-		canvas.remove(activeShape.current);
-
-		// Cria o polígono final
-		const polygon = new fabric.Polygon(polyPoints, {
-			stroke: "#333333",
-			strokeWidth: 1,
-			fill: brushColor,
-			opacity: 1,
-			selectable: true,
-			hasBorders: true,
-			hasControls: true,
-			evented: true,
-		});
-		canvas.add(polygon);
-
-		// Limpa referências
-		activeShape.current = null;
-		pointArray.current = [];
-		lineArray.current = [];
-
-		canvas.selection = true;
-		saveStateManualmente();
-		message.success("Polígono finalizado!");
-	};
+	//----------------------------------------------------------------
+	// 5) Funções auxiliares
+	//----------------------------------------------------------------
 
 	/**
 	 * Cancela qualquer polígono em andamento
 	 */
-	const cancelPolygonDrawing = () => {
+	function cancelPolygonDrawing() {
 		const canvas = fabricCanvasRef.current;
 		if (!canvas) return;
 
@@ -319,30 +338,12 @@ const CanvasArea: React.FC = () => {
 		pointArray.current = [];
 		lineArray.current = [];
 		canvas.renderAll();
-	};
-
-	/**
-	 * Handler de clique no modo borracha:
-	 * - Se clicar em um objeto, remove do canvas.
-	 */
-	const handleEraserClick = (options: fabric.IEvent<MouseEvent>) => {
-		const canvas = fabricCanvasRef.current;
-		if (!canvas) return;
-		if (!isEraserMode) return;
-
-		const target = options.target;
-		if (target) {
-			canvas.remove(target);
-			canvas.discardActiveObject();
-			canvas.requestRenderAll();
-			saveStateManualmente();
-		}
-	};
+	}
 
 	/**
 	 * Salva estado manualmente no undoStack
 	 */
-	const saveStateManualmente = () => {
+	function saveStateManualmente() {
 		const canvas = fabricCanvasRef.current;
 		if (!canvas) return;
 
@@ -354,11 +355,33 @@ const CanvasArea: React.FC = () => {
 			undoStack.current.push(currentState);
 			redoStack.current = [];
 		}
-	};
+	}
 
-	// --------------- FUNÇÕES DE BOTÃO/TELA --------------
+	/**
+	 * Undo
+	 */
+	function undo() {
+		const canvas = fabricCanvasRef.current;
+		if (!canvas) return;
 
-	const handleImageUpload = (file: File) => {
+		if (undoStack.current.length > 1) {
+			const lastState = undoStack.current.pop();
+			if (lastState) {
+				redoStack.current.push(lastState);
+			}
+			const previousState = undoStack.current[undoStack.current.length - 1];
+			canvas.loadFromJSON(previousState).then(() => {
+				canvas.renderAll();
+			});
+		} else {
+			message.warning("Nada para desfazer.");
+		}
+	}
+
+	//----------------------------------------------------------------
+	// 6) Upload de Imagem
+	//----------------------------------------------------------------
+	function handleImageUpload(file: File) {
 		const reader = new FileReader();
 		reader.onload = (e) => {
 			if (!e.target?.result) {
@@ -376,71 +399,57 @@ const CanvasArea: React.FC = () => {
 		};
 		reader.readAsDataURL(file);
 		return false;
-	};
+	}
 
-	/**
-	 * Toggle para ligar/desligar modo brush
-	 */
-	const toggleBrushing = () => {
+	//----------------------------------------------------------------
+	// 7) Botões: toggles para Brush, Polygon, Eraser
+	//----------------------------------------------------------------
+	function toggleBrushing() {
 		const canvas = fabricCanvasRef.current;
 		if (!canvas) return;
 
-		// Se vamos ligar brush, desliga polígono/eraser
-		if (!isBrushing) {
+		if (isBrushing) {
+			setIsBrushing(false);
+			canvas.isDrawingMode = false;
+		} else {
+			setIsBrushing(true);
 			setIsPolygonMode(false);
 			setIsEraserMode(false);
 			canvas.isDrawingMode = true;
-		} else {
-			canvas.isDrawingMode = false;
 		}
-		setIsBrushing(!isBrushing);
-	};
+	}
 
-	/**
-	 * Toggle para ligar/desligar modo polígono
-	 */
-	const togglePolygonMode = () => {
-		// Se vamos ativar polígono, desliga brush e eraser
-		if (!isPolygonMode) {
-			setIsBrushing(false);
-			setIsEraserMode(false);
-		}
-		setIsPolygonMode(!isPolygonMode);
-	};
-
-	/**
-	 * Toggle para ligar/desligar modo borracha
-	 */
-	const toggleEraserMode = () => {
+	function togglePolygonMode() {
 		const canvas = fabricCanvasRef.current;
 		if (!canvas) return;
 
-		// Se estamos ativando eraser, desliga brush e polígono
-		if (!isEraserMode) {
+		if (isPolygonMode) {
+			setIsPolygonMode(false);
+		} else {
+			setIsPolygonMode(true);
+			setIsBrushing(false);
+			setIsEraserMode(false);
+			canvas.isDrawingMode = false;
+		}
+	}
+
+	function toggleEraserMode() {
+		const canvas = fabricCanvasRef.current;
+		if (!canvas) return;
+
+		if (isEraserMode) {
+			setIsEraserMode(false);
+		} else {
+			setIsEraserMode(true);
 			setIsBrushing(false);
 			setIsPolygonMode(false);
 			canvas.isDrawingMode = false;
 		}
+	}
 
-		setIsEraserMode(!isEraserMode);
-	};
-
-	const undo = () => {
-		if (fabricCanvasRef.current && undoStack.current.length > 1) {
-			const lastState = undoStack.current.pop();
-			if (lastState) {
-				redoStack.current.push(lastState);
-			}
-
-			const previousState = undoStack.current[undoStack.current.length - 1];
-			fabricCanvasRef.current.loadFromJSON(previousState).then(() => {
-				fabricCanvasRef.current!.renderAll();
-			});
-		} else {
-			message.warning("Nada para desfazer.");
-		}
-	};
-
+	//----------------------------------------------------------------
+	// 8) Render
+	//----------------------------------------------------------------
 	return (
 		<div
 			id="canvas-div"
@@ -498,22 +507,18 @@ const CanvasArea: React.FC = () => {
 							onChange={(e) => setBrushWidth(Number(e.target.value))}
 						/>
 
-						{/* Brush */}
 						<button onClick={toggleBrushing}>
 							{isBrushing ? "Disable Brush" : "Enable Brush"}
 						</button>
 
-						{/* Polygon */}
 						<button onClick={togglePolygonMode}>
 							{isPolygonMode ? "Disable Polygon" : "Enable Polygon"}
 						</button>
 
-						{/* Eraser */}
 						<button onClick={toggleEraserMode}>
 							{isEraserMode ? "Disable Eraser" : "Enable Eraser"}
 						</button>
 
-						{/* Undo */}
 						<button onClick={undo}>Undo</button>
 					</div>
 				</>
