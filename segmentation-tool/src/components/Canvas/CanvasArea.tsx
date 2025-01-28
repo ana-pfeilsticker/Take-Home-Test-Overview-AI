@@ -2,13 +2,13 @@ import React, { useRef, useEffect, useState } from "react";
 import * as fabric from "fabric";
 import { Upload, message } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
-import theme from "../../styles/theme";
 
 const CanvasArea: React.FC = () => {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
 	const undoStack = useRef<string[]>([]); // Pilha de estados para undo
 	const [isImageUploaded, setIsImageUploaded] = useState(false);
+	const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
 	const [brushColor, setBrushColor] = useState("#FF0000");
 	const [brushWidth, setBrushWidth] = useState(5);
 	const [isBrushing, setIsBrushing] = useState(true);
@@ -19,11 +19,24 @@ const CanvasArea: React.FC = () => {
 			return;
 		}
 
+		const canvasDiv = document.getElementById("canvas-div");
+		if (!canvasDiv) {
+			console.error("Elemento canvas-div não encontrado!");
+			return;
+		}
+
+		const width = canvasDiv.clientWidth;
+		const height = canvasDiv.clientHeight;
+
 		// Inicializar o canvas com Fabric.js
 		const canvas = new fabric.Canvas(canvasRef.current, {
 			isDrawingMode: true,
 			selection: false,
+			backgroundColor: "transparent",
+			width,
+			height,
 		});
+
 
 		fabricCanvasRef.current = canvas;
 
@@ -32,19 +45,7 @@ const CanvasArea: React.FC = () => {
 		canvas.freeDrawingBrush.color = brushColor;
 		canvas.freeDrawingBrush.width = brushWidth;
 
-		// Redimensionar o canvas ao montar e ao redimensionar a janela
-		const resizeCanvas = () => {
-			const parent = canvasRef.current!.parentElement!;
-			canvas.setWidth(parent.offsetWidth);
-			canvas.setHeight(parent.offsetHeight);
-			canvas.renderAll();
-		};
-
-		resizeCanvas();
-		window.addEventListener("resize", resizeCanvas);
-
 		return () => {
-			window.removeEventListener("resize", resizeCanvas);
 			canvas.dispose();
 		};
 	}, []);
@@ -59,80 +60,20 @@ const CanvasArea: React.FC = () => {
 		}
 	}, [brushColor, brushWidth]);
 
-	const saveState = () => {
-		if (fabricCanvasRef.current) {
-			const canvas = fabricCanvasRef.current;
-
-			// Salva o estado atual como JSON
-			const state = JSON.stringify(canvas.toJSON());
-			undoStack.current.push(state); // Adiciona ao stack
-			console.log("Estado salvo:", undoStack.current);
-		}
-	};
-
-	const undo = () => {
-		if (fabricCanvasRef.current && undoStack.current.length > 1) {
-			const canvas = fabricCanvasRef.current;
-
-			// Remove o estado atual do stack e carrega o estado anterior
-			undoStack.current.pop();
-			const previousState = undoStack.current[undoStack.current.length - 1];
-
-			canvas.loadFromJSON(previousState, () => {
-				canvas.renderAll();
-				console.log("Desfeito para o estado anterior.");
-			});
-		} else {
-			message.warning("Nada para desfazer.");
-		}
-	};
-
 	const handleImageUpload = (file: File) => {
 		const reader = new FileReader();
 
 		reader.onload = (e) => {
-			if (!e.target?.result || !fabricCanvasRef.current) {
-				console.error("Erro ao carregar a imagem ou canvas não inicializado.");
+			if (!e.target?.result) {
+				console.error("Erro ao carregar a imagem.");
 				message.error("Erro ao carregar a imagem.");
 				return;
 			}
 
-			const imageUrl = e.target.result as string;
-			const imgElement = document.createElement("img");
-			imgElement.src = imageUrl;
-
-			imgElement.onload = () => {
-				const img = new fabric.Image(imgElement, {
-					selectable: false, // A imagem não pode ser selecionada
-				});
-
-				const canvas = fabricCanvasRef.current!;
-				const canvasWidth = canvas.getWidth();
-				const canvasHeight = canvas.getHeight();
-
-				// Escalar a imagem para caber no canvas
-				const scaleX = canvasWidth / img.width!;
-				const scaleY = canvasHeight / img.height!;
-				const scale = Math.max(scaleX, scaleY);
-
-				img.scale(scale);
-				img.set({
-					left: (canvasWidth - img.width! * scale) / 2,
-					top: (canvasHeight - img.height! * scale) / 2,
-				});
-
-				canvas.add(img); // Adiciona a imagem ao canvas
-				canvas.renderAll();
-
-				setIsImageUploaded(true);
-				saveState(); // Salva o estado inicial com a imagem
-				message.success("Imagem carregada com sucesso!");
-			};
-
-			imgElement.onerror = () => {
-				console.error("Erro ao carregar a imagem no elemento <img>.");
-				message.error("Erro ao carregar a imagem.");
-			};
+			// Define a imagem como background da div
+			setBackgroundImage(e.target.result as string);
+			setIsImageUploaded(true);
+			message.success("Imagem de fundo definida com sucesso!");
 		};
 
 		reader.onerror = () => {
@@ -158,13 +99,18 @@ const CanvasArea: React.FC = () => {
 				height: "60%",
 				width: "100%",
 				borderRadius: "20px",
+				position: "relative",
+				backgroundImage: backgroundImage ? `url(${backgroundImage})` : "none",
+				backgroundSize: "cover",
+				backgroundPosition: "center",
+				backgroundRepeat: "no-repeat",
 			}}
+			id="canvas-div"
 		>
 			<div
 				style={{
 					width: "100%",
 					height: "100%",
-					backgroundColor: theme.lightBackgroundColor,
 					borderRadius: "10px",
 					display: "flex",
 					flexDirection: "column",
@@ -173,45 +119,30 @@ const CanvasArea: React.FC = () => {
 					position: "relative",
 				}}
 			>
-				{!isImageUploaded && (
-					<div
+				{!isImageUploaded && <Upload beforeUpload={handleImageUpload} showUploadList={false}>
+					<button
 						style={{
-							position: "absolute",
-							zIndex: 10,
-							display: "flex",
-							flexDirection: "column",
-							justifyContent: "center",
-							alignItems: "center",
-							backgroundColor: theme.lightBackgroundColor,
-							width: "100%",
-							height: "100%",
-							borderRadius: "10px",
+							padding: "10px 20px",
+							backgroundColor: "#5E4AE3",
+							color: "#fff",
+							borderRadius: "8px",
+							border: "none",
+							cursor: "pointer",
+							marginBottom: "10px",
 						}}
 					>
-						<Upload beforeUpload={handleImageUpload} showUploadList={false}>
-							<button
-								style={{
-									padding: "10px 20px",
-									backgroundColor: "#5E4AE3",
-									color: "#fff",
-									borderRadius: "8px",
-									border: "none",
-									cursor: "pointer",
-								}}
-							>
-								<UploadOutlined /> Upload Image
-							</button>
-						</Upload>
-					</div>
-				)}
+						<UploadOutlined /> Upload Image
+					</button>
+				</Upload>}
+
 				<canvas
 					ref={canvasRef}
-					height={600}
-					width={800}
 					style={{
+						position: "absolute",
+						top: 0,
+						left: 0,
 						width: "100%",
 						height: "100%",
-						display: "block",
 					}}
 				/>
 				<div style={{ marginTop: "10px" }}>
@@ -229,9 +160,6 @@ const CanvasArea: React.FC = () => {
 					/>
 					<button onClick={toggleBrushing}>
 						{isBrushing ? "Disable Brush" : "Enable Brush"}
-					</button>
-					<button onClick={undo} style={{ marginLeft: "10px" }}>
-						Undo
 					</button>
 				</div>
 			</div>
