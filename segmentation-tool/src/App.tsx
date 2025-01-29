@@ -5,6 +5,7 @@ import theme from "./styles/theme";
 import ClassesPanel from "./components/ClassesPanel/ClassesPanel";
 import CanvasArea from "./components/Canvas/CanvasArea";
 import { useState } from "react";
+import "./App.css";
 
 export interface ClassItemInterface {
 	id: number;
@@ -39,12 +40,15 @@ function App() {
 			}}
 		>
 			<AntdApp>
-				<Layout style={{ height: "100vh", background: "#FBFBFB" }}>
+				<Layout id="layout" style={{ height: "100vh", background: "#FBFBFB" }}>
 					<Sider
+						id="sider"
 						width="25%"
 						style={{
 							background: theme.backgroundColor,
 							padding: "20px",
+							minWidth: "300px",
+							zIndex: "1000",
 						}}
 					>
 						<ClassesPanel

@@ -5,6 +5,7 @@ import { DiSenchatouch } from "react-icons/di";
 import { IoShareOutline } from "react-icons/io5";
 import { LuUndo2 } from "react-icons/lu";
 import { PiPolygonLight } from "react-icons/pi";
+import "./Toolbar.css";
 
 interface ToolBarProps {
 	onToggleBrush: () => void;
@@ -33,28 +34,18 @@ const ToolBar: React.FC<ToolBarProps> = ({
 }) => {
 	return (
 		<div
+			className="toolbar"
 			style={{
-				display: "flex",
-				flexDirection: "column",
 				alignItems: "center",
 				justifyContent: "space-between",
-				height: "100%",
-				width: "60px",
 				backgroundColor: "#fff",
 				borderRadius: "10px",
 				boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-				padding: "10px 0",
+				padding: "10px 10px",
 			}}
 		>
 			{/* Menu de ferramentas */}
-			<div
-				style={{
-					display: "flex",
-					flexDirection: "column",
-					alignItems: "center",
-					gap: "20px",
-				}}
-			>
+			<div className="tools-menu">
 				{/* Brush */}
 				<button
 					onClick={onToggleBrush}
@@ -71,42 +62,31 @@ const ToolBar: React.FC<ToolBarProps> = ({
 				>
 					<BsBrush />
 				</button>
+				{isBrushingActive && (
+					<div className="brush-size-control">
+						<AiOutlineAlibaba
+							style={{
+								color: "#5E4AE3",
+								fontSize: "30px",
+								stroke: "2px",
+							}}
+						/>
+						<input
+							type="range"
+							min={1}
+							max={50}
+							value={brushWidth}
+							onChange={(e) => onBrushWidthChange(Number(e.target.value))}
+						/>
 
-				<div
-					style={{
-						display: "flex",
-						flexDirection: "column",
-						alignItems: "center",
-						gap: "5px",
-					}}
-				>
-					<AiOutlineAlibaba
-						style={{
-							color: "#5E4AE3",
-							fontSize: "30px",
-							stroke: "2px",
-						}}
-					/>
-					<input
-						type="range"
-						min={1}
-						max={50}
-						value={brushWidth}
-						onChange={(e) => onBrushWidthChange(Number(e.target.value))}
-						style={{
-							width: "40px",
-							writingMode: "vertical-lr",
-							cursor: "pointer",
-						}}
-					/>
-
-					<DiSenchatouch
-						style={{
-							color: "#5E4AE3",
-							fontSize: "30px",
-						}}
-					/>
-				</div>
+						<DiSenchatouch
+							style={{
+								color: "#5E4AE3",
+								fontSize: "30px",
+							}}
+						/>
+					</div>
+				)}
 
 				{/* Polygon */}
 				<button

@@ -4,6 +4,7 @@ import { Upload, message } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import { validateCOCOOnServer } from "../../services/cocoService";
 import ToolBar from "../Toolbar/Toobar";
+import "./CanvasArea.css";
 
 interface ClassItemInterface {
 	id: number;
@@ -35,7 +36,7 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 	const [brushWidth, setBrushWidth] = useState(5);
 
 	// Modo brush, polígono e borracha
-	const [isBrushing, setIsBrushing] = useState(true);
+	const [isBrushing, setIsBrushing] = useState(false);
 	const [isPolygonMode, setIsPolygonMode] = useState(false);
 	const [isEraserMode, setIsEraserMode] = useState(false);
 
@@ -61,7 +62,7 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 		const height = canvasDiv.clientHeight;
 
 		const canvas = new fabric.Canvas(canvasRef.current, {
-			isDrawingMode: true,
+			isDrawingMode: false,
 			selection: false,
 			backgroundColor: "transparent",
 			width,
@@ -439,6 +440,13 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 		const canvas = fabricCanvasRef.current;
 		if (!canvas) return;
 
+		if (!selectedClass) {
+			message.warning("Select a class to draw");
+			canvas.isDrawingMode = false;
+
+			return;
+		}
+
 		if (isBrushing) {
 			setIsBrushing(false);
 			canvas.isDrawingMode = false;
@@ -453,6 +461,13 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 	function togglePolygonMode() {
 		const canvas = fabricCanvasRef.current;
 		if (!canvas) return;
+
+		if (!selectedClass) {
+			message.warning("Select a class to draw");
+			setIsPolygonMode(false);
+
+			return;
+		}
 
 		if (isPolygonMode) {
 			setIsPolygonMode(false);
@@ -611,18 +626,18 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 	// ============================
 	return (
 		<div
+			className="canvas-toolbar"
 			style={{
 				display: "flex",
 				height: "100%",
 				width: "100%",
 				justifyContent: "space-between",
+				alignContent: "center",
 			}}
 		>
 			<div
 				id="canvas-div"
 				style={{
-					height: "100%",
-					width: "90%",
 					borderRadius: "20px",
 					display: "flex",
 					position: "relative",
@@ -633,21 +648,33 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 				}}
 			>
 				{!isImageUploaded ? (
-					<Upload beforeUpload={handleImageUpload} showUploadList={false}>
-						<button
-							style={{
-								padding: "10px 20px",
-								backgroundColor: "#5E4AE3",
-								color: "#fff",
-								borderRadius: "8px",
-								border: "none",
-								cursor: "pointer",
-								marginBottom: "10px",
-							}}
-						>
-							<UploadOutlined /> Upload Image
-						</button>
-					</Upload>
+					<div
+						style={{
+							display: "flex",
+							flexDirection: "column",
+							alignItems: "center",
+							justifyContent: "center",
+							gap: "4px",
+							width: "100%",
+						}}
+					>
+						<Upload beforeUpload={handleImageUpload} showUploadList={false}>
+							<button
+								style={{
+									padding: "10px 20px",
+									backgroundColor: "#5E4AE3",
+									color: "#fff",
+									borderRadius: "8px",
+									border: "none",
+									cursor: "pointer",
+									marginBottom: "10px",
+								}}
+							>
+								<UploadOutlined /> Upload Image
+							</button>
+						</Upload>
+						<p>Upload a image to make anotations</p>
+					</div>
 				) : (
 					<>
 						<canvas
