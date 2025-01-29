@@ -4,7 +4,6 @@ import { Upload, message } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import { validateCOCOOnServer } from "../../services/cocoService";
 import ToolBar from "../Toolbar/Toobar";
-import "./CanvasArea.css";
 
 interface ClassItemInterface {
 	id: number;
@@ -36,7 +35,7 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 	const [brushWidth, setBrushWidth] = useState(5);
 
 	// Modo brush, polígono e borracha
-	const [isBrushing, setIsBrushing] = useState(false);
+	const [isBrushing, setIsBrushing] = useState(true);
 	const [isPolygonMode, setIsPolygonMode] = useState(false);
 	const [isEraserMode, setIsEraserMode] = useState(false);
 
@@ -62,7 +61,7 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 		const height = canvasDiv.clientHeight;
 
 		const canvas = new fabric.Canvas(canvasRef.current, {
-			isDrawingMode: false,
+			isDrawingMode: true,
 			selection: false,
 			backgroundColor: "transparent",
 			width,
@@ -160,26 +159,6 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 
 			function handlePolygonLocal(options: fabric.IEvent<MouseEvent>) {
 				if (!canvas) return;
-
-				// Se a classe não existir, já retorna
-				if (!selectedClass) {
-					message.warning("Select a class to draw");
-					return;
-				}
-
-				// 1) Verifica se há objeto “por baixo” do clique
-				const target = canvas.findTarget(options.e, false);
-				if (target) {
-					const objClassId = (target as any).data?.classId;
-					// Se for de outra classe, avisa e interrompe
-					if (objClassId && objClassId !== selectedClass.id) {
-						message.warning(
-							"Please make sure you're selecting a free class area"
-						);
-						return; // cancela a criação do ponto
-					}
-				}
-
 				const pointer = canvas.getPointer(options.e);
 				const zoom = canvas.getZoom();
 
@@ -460,13 +439,6 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 		const canvas = fabricCanvasRef.current;
 		if (!canvas) return;
 
-		if (!selectedClass) {
-			message.warning("Select a class to draw");
-			canvas.isDrawingMode = false;
-
-			return;
-		}
-
 		if (isBrushing) {
 			setIsBrushing(false);
 			canvas.isDrawingMode = false;
@@ -481,13 +453,6 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 	function togglePolygonMode() {
 		const canvas = fabricCanvasRef.current;
 		if (!canvas) return;
-
-		if (!selectedClass) {
-			message.warning("Select a class to draw");
-			setIsPolygonMode(false);
-
-			return;
-		}
 
 		if (isPolygonMode) {
 			setIsPolygonMode(false);
@@ -646,20 +611,21 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 	// ============================
 	return (
 		<div
-			className="canvas-toolbar"
 			style={{
 				display: "flex",
 				height: "100%",
 				width: "100%",
 				justifyContent: "space-between",
-				alignContent: "center",
 			}}
 		>
 			<div
 				id="canvas-div"
 				style={{
+					height: "100%",
+					width: "90%",
 					borderRadius: "20px",
 					display: "flex",
+					justifyContent: "center",
 					position: "relative",
 					backgroundImage: backgroundImage ? `url(${backgroundImage})` : "none",
 					backgroundSize: "cover",
@@ -674,8 +640,6 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 							flexDirection: "column",
 							alignItems: "center",
 							justifyContent: "center",
-							gap: "4px",
-							width: "100%",
 						}}
 					>
 						<Upload beforeUpload={handleImageUpload} showUploadList={false}>
