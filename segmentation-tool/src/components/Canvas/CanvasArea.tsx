@@ -160,6 +160,26 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 
 			function handlePolygonLocal(options: fabric.IEvent<MouseEvent>) {
 				if (!canvas) return;
+
+				// Se a classe não existir, já retorna
+				if (!selectedClass) {
+					message.warning("Select a class to draw");
+					return;
+				}
+
+				// 1) Verifica se há objeto “por baixo” do clique
+				const target = canvas.findTarget(options.e, false);
+				if (target) {
+					const objClassId = (target as any).data?.classId;
+					// Se for de outra classe, avisa e interrompe
+					if (objClassId && objClassId !== selectedClass.id) {
+						message.warning(
+							"Please make sure you're selecting a free class area"
+						);
+						return; // cancela a criação do ponto
+					}
+				}
+
 				const pointer = canvas.getPointer(options.e);
 				const zoom = canvas.getZoom();
 
