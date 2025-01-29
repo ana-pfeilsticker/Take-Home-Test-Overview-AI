@@ -1,0 +1,15 @@
+#canvas-div {
+	height: 100%;
+	width: 90%;
+}
+
+@media (max-width: 800px) {
+	.canvas-toolbar {
+		flex-direction: column;
+	}
+
+	#canvas-div {
+		height: 90%;
+		width: 99%;
+	}
+}

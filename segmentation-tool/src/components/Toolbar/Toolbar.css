@@ -1,0 +1,53 @@
+.toolbar {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	width: 60px;
+}
+.tools-menu {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 20px;
+}
+
+.brush-size-control {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 5px;
+}
+
+.brush-size-control input[type="range"] {
+	writing-mode: vertical-lr;
+	width: 40px;
+}
+
+@media (max-width: 800px) {
+	.toolbar {
+		flex-direction: row;
+		height: 60px;
+		width: 99%;
+	}
+
+	.tools-menu {
+		flex-direction: row;
+	}
+
+	.brush-size-control {
+		flex-direction: row; /* agora fica em linha */
+		gap: 10px;
+		justify-content: center;
+		position: absolute;
+		background-color: white;
+		padding: 4px;
+		border-radius: 2px;
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+		left: 80px;
+	}
+
+	.brush-size-control input[type="range"] {
+		writing-mode: horizontal-tb; /* ou "horizontal-lr" se preferir */
+		width: 100px; /* maior, para deslizar melhor */
+	}
+}
