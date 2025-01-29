@@ -73,3 +73,4 @@ Now the backend will be running on port `5002` to validate COCO files.
 ---
 
 📧 **Contact**: [anapfeilsticker@gmail.com](mailto:anapfeilsticker@gmail.com)
+You can check some overview of the software in this youtube video https://youtu.be/02XMK5OZftI
