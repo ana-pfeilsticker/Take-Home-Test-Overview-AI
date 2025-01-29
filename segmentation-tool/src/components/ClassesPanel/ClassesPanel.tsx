@@ -8,25 +8,28 @@ interface ClassItemInterface {
 	color: string;
 }
 
-function ClassesPanel() {
-	const [classes, setClasses] = useState<ClassItemInterface[]>([
-		{ id: 1, name: "Car", color: "#FFA500" }, // Exemplo inicial
-		{ id: 2, name: "Grass", color: "#9370DB" },
-		{ id: 3, name: "Tree", color: "#228B22" },
-	]);
+// Tipo das props que o ClassesPanel espera
+interface ClassesPanelProps {
+	classes: ClassItemInterface[]; // <-- array vindo do pai
+	selectedClassId: number | null;
+	onClassSelect: (classItem: ClassItemInterface) => void;
+	onAddClass: (className: string, color: string) => void;
+}
 
+function ClassesPanel({
+	classes,
+	selectedClassId,
+	onClassSelect,
+	onAddClass,
+}: ClassesPanelProps) {
 	const [newClassName, setNewClassName] = useState<string>("");
 
-	const handleAddClass = () => {
-		if (!newClassName.trim()) return; // Don't add empty classes
-		const newClass: ClassItemInterface = {
-			id: classes.length + 1,
-			name: newClassName,
-			color: currentColor,
-		};
-		setClasses([...classes, newClass]);
-		setNewClassName(""); // Clear input
-	};
+	function handleAddClassClick() {
+		if (!newClassName.trim()) return;
+		onAddClass(newClassName, currentColor); // chama callback do pai
+		setNewClassName(""); // reseta input
+		handleColorChange(); // gera nova cor
+	}
 
 	const getRandomColor = (): string => {
 		// Color generator
@@ -63,31 +66,38 @@ function ClassesPanel() {
 			>
 				Classes
 			</h3>
-			<div>
-				{classes.map((item) => (
-					<div
-						key={item.id}
-						style={{
-							display: "flex",
-							alignItems: "center",
-							marginBottom: "10px",
-							gap: "10px",
-							minHeight: "38px",
-							background: theme.backgroundColor,
-							borderRadius: "10px",
-						}}
-					>
+			<div style={{ overflowY: "auto", flexGrow: 1, marginBottom: "20px" }}>
+				{classes.map((item) => {
+					// Verifica se esta classe é a atualmente selecionada
+					const isSelected = item.id === selectedClassId;
+					return (
 						<div
+							key={item.id}
+							onClick={() => onClassSelect(item)}
 							style={{
-								width: "10px",
-								height: "38px",
-								backgroundColor: item.color,
-								borderRadius: "10px 0px 0px 10px",
+								display: "flex",
+								alignItems: "center",
+								marginBottom: "10px",
+								gap: "10px",
+								minHeight: "38px",
+								borderRadius: "10px",
+								backgroundColor: theme.backgroundColor,
+								cursor: "pointer",
+								border: isSelected ? `2px solid ${item.color}` : "none",
 							}}
-						></div>
-						<span style={{ color: theme.textColor }}>{item.name}</span>
-					</div>
-				))}
+						>
+							<div
+								style={{
+									width: "10px",
+									height: "38px",
+									backgroundColor: item.color,
+									borderRadius: "10px 0px 0px 10px",
+								}}
+							/>
+							<span style={{ color: theme.textColor }}>{item.name}</span>
+						</div>
+					);
+				})}
 			</div>
 			<div
 				style={{
@@ -105,7 +115,7 @@ function ClassesPanel() {
 					onReloadColor={handleColorChange}
 				/>
 				<button
-					onClick={handleAddClass}
+					onClick={handleAddClassClick}
 					style={{
 						backgroundColor: theme.primaryColor,
 						color: "#fff",

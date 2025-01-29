@@ -5,8 +5,35 @@ import theme from "./styles/theme";
 import ClassesPanel from "./components/ClassesPanel/ClassesPanel";
 import CanvasArea from "./components/Canvas/CanvasArea";
 import ToolBar from "./components/Toolbar/Toobar";
+import { useState } from "react";
 
+export interface ClassItemInterface {
+	id: number;
+	name: string;
+	color: string;
+}
 function App() {
+	const [classes, setClasses] = useState<ClassItemInterface[]>([
+		{ id: 1, name: "Car", color: "#FFA500" },
+		{ id: 2, name: "Grass", color: "#9370DB" },
+		{ id: 3, name: "Tree", color: "#228B22" },
+	]);
+	const [selectedClass, setSelectedClass] = useState<ClassItemInterface | null>(
+		null
+	);
+
+	function handleAddClass(newClassName: string, color: string) {
+		const newClass: ClassItemInterface = {
+			id: classes.length + 1,
+			name: newClassName,
+			color,
+		};
+		setClasses([...classes, newClass]);
+	}
+
+	const handleClassSelect = (cls: ClassItemInterface) => {
+		setSelectedClass(cls);
+	};
 	return (
 		<ConfigProvider
 			theme={{
@@ -25,12 +52,16 @@ function App() {
 							padding: "20px",
 						}}
 					>
-						<ClassesPanel />
+						<ClassesPanel
+							classes={classes} // passa o array
+							selectedClassId={selectedClass?.id ?? null}
+							onClassSelect={handleClassSelect}
+							onAddClass={handleAddClass}
+						/>
 					</Sider>
 					<Content
 						style={{
 							padding: "20px",
-							flexGrow: 1,
 							gap: "25px",
 							display: "flex",
 						}}
@@ -41,24 +72,10 @@ function App() {
 								width: "100%",
 								display: "flex",
 								flexDirection: "column",
-								gap: "25px",
 							}}
 						>
-							<CanvasArea />
-							<div
-								style={{
-									height: "40%",
-									width: "100%",
-									backgroundColor: theme.lightBackgroundColor,
-									borderRadius: "20px",
-									padding: "20px",
-								}}
-							>
-								Preview
-							</div>
+							<CanvasArea selectedClass={selectedClass} allClasses={classes} />
 						</div>
-
-						<ToolBar />
 					</Content>
 				</Layout>
 			</AntdApp>

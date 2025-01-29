@@ -1,13 +1,36 @@
 import React from "react";
-import { FaPaintBrush, FaShapes, FaEraser, FaUndoAlt } from "react-icons/fa";
+import { AiOutlineAlibaba } from "react-icons/ai";
+import { BsBrush, BsEraser } from "react-icons/bs";
+import { DiSenchatouch } from "react-icons/di";
 import { IoShareOutline } from "react-icons/io5";
+import { LuUndo2 } from "react-icons/lu";
+import { PiPolygonLight } from "react-icons/pi";
 
-const ToolBar: React.FC = () => {
-	const handleExport = () => {
-		console.log("Exporting data...");
-		// Lógica de exportação será adicionada aqui no futuro
-	};
+interface ToolBarProps {
+	onToggleBrush: () => void;
+	onTogglePolygon: () => void;
+	onToggleEraser: () => void;
+	onUndo: () => void;
+	onExport: () => void;
+	brushWidth: number;
+	onBrushWidthChange: (val: number) => void;
+	isBrushingActive: boolean;
+	isPolygonActive: boolean;
+	isEraserActive: boolean;
+}
 
+const ToolBar: React.FC<ToolBarProps> = ({
+	onToggleBrush,
+	onTogglePolygon,
+	onToggleEraser,
+	onUndo,
+	onExport,
+	brushWidth,
+	onBrushWidthChange,
+	isBrushingActive,
+	isPolygonActive,
+	isEraserActive,
+}) => {
 	return (
 		<div
 			style={{
@@ -32,55 +55,114 @@ const ToolBar: React.FC = () => {
 					gap: "20px",
 				}}
 			>
+				{/* Brush */}
 				<button
+					onClick={onToggleBrush}
 					style={{
-						background: "none",
+						background: isBrushingActive ? "#5E4AE3" : "none",
 						border: "none",
 						cursor: "pointer",
-						fontSize: "20px",
-						color: "#5E4AE3",
+						fontSize: "30px",
+						color: isBrushingActive ? "white" : "#5E4AE3",
+						width: "40px",
+						height: "40px",
+						borderRadius: "5px",
 					}}
 				>
-					<FaPaintBrush />
+					<BsBrush />
 				</button>
-				<button
+
+				<div
 					style={{
-						background: "none",
-						border: "none",
-						cursor: "pointer",
-						fontSize: "20px",
-						color: "#5E4AE3",
+						display: "flex",
+						flexDirection: "column",
+						alignItems: "center",
+						gap: "5px",
 					}}
 				>
-					<FaShapes />
+					<AiOutlineAlibaba
+						style={{
+							color: "#5E4AE3",
+							fontSize: "30px",
+							stroke: "2px",
+						}}
+					/>
+					<input
+						type="range"
+						min={1}
+						max={50}
+						value={brushWidth}
+						onChange={(e) => onBrushWidthChange(Number(e.target.value))}
+						style={{
+							width: "40px",
+							writingMode: "vertical-lr",
+							cursor: "pointer",
+						}}
+					/>
+
+					<DiSenchatouch
+						style={{
+							color: "#5E4AE3",
+							fontSize: "30px",
+						}}
+					/>
+				</div>
+
+				{/* Polygon */}
+				<button
+					onClick={onTogglePolygon}
+					style={{
+						background: isPolygonActive ? "#5E4AE3" : "none",
+						border: "none",
+						cursor: "pointer",
+						fontSize: "30px",
+						color: isPolygonActive ? "white" : "#5E4AE3",
+						width: "40px",
+						height: "40px",
+						borderRadius: "5px",
+					}}
+				>
+					<PiPolygonLight />
 				</button>
+
+				{/* Eraser */}
 				<button
+					onClick={onToggleEraser}
 					style={{
-						background: "none",
+						background: isEraserActive ? "#5E4AE3" : "none",
 						border: "none",
 						cursor: "pointer",
-						fontSize: "20px",
-						color: "#5E4AE3",
+						fontSize: "30px",
+						color: isEraserActive ? "white" : "#5E4AE3",
+						width: "40px",
+						height: "40px",
+						borderRadius: "5px",
 					}}
 				>
-					<FaEraser />
+					<BsEraser />
 				</button>
+
+				{/* Undo */}
 				<button
+					onClick={onUndo}
 					style={{
 						background: "none",
 						border: "none",
 						cursor: "pointer",
-						fontSize: "20px",
+						fontSize: "30px",
 						color: "#5E4AE3",
+						width: "40px",
+						height: "40px",
+						borderRadius: "5px",
 					}}
 				>
-					<FaUndoAlt />
+					<LuUndo2 />
 				</button>
 			</div>
 
 			{/* Botão de exportação */}
 			<button
-				onClick={handleExport}
+				onClick={onExport}
 				style={{
 					display: "flex",
 					alignItems: "center",

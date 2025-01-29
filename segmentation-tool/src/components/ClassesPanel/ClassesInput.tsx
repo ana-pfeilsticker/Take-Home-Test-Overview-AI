@@ -1,6 +1,6 @@
 import React from "react";
 import theme from "../../styles/theme";
-import { TbReload } from "react-icons/tb";
+import { HiOutlineRefresh } from "react-icons/hi";
 
 interface CustomInputProps {
 	placeholder: string;
@@ -61,7 +61,7 @@ const CustomInput: React.FC<CustomInputProps> = ({
 					height: "100%",
 				}}
 			>
-				<TbReload
+				<HiOutlineRefresh
 					style={{
 						color: lightenColor(currentColor, 99),
 						fontSize: "16px",

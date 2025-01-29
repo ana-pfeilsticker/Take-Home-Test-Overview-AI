@@ -2,8 +2,24 @@ import React, { useRef, useEffect, useState } from "react";
 import * as fabric from "fabric";
 import { Upload, message } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
+import { validateCOCOOnServer } from "../../services/cocoService";
+import ToolBar from "../Toolbar/Toobar";
 
-const CanvasArea: React.FC = () => {
+interface ClassItemInterface {
+	id: number;
+	name: string;
+	color: string;
+}
+
+interface CanvasAreaProps {
+	selectedClass: ClassItemInterface | null;
+	allClasses: ClassItemInterface[];
+}
+
+const CanvasArea: React.FC<CanvasAreaProps> = ({
+	selectedClass,
+	allClasses,
+}) => {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
 
@@ -14,7 +30,8 @@ const CanvasArea: React.FC = () => {
 	// Estados principais
 	const [isImageUploaded, setIsImageUploaded] = useState(false);
 	const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
-	const [brushColor, setBrushColor] = useState("#FF0000");
+
+	// Brush config
 	const [brushWidth, setBrushWidth] = useState(5);
 
 	// Modo brush, polígono e borracha
@@ -28,9 +45,9 @@ const CanvasArea: React.FC = () => {
 	const activeLine = useRef<fabric.Line | null>(null);
 	const activeShape = useRef<fabric.Polygon | null>(null);
 
-	//----------------------------------------------------------------
-	// 1) Inicialização do Canvas (roda só quando a imagem é carregada)
-	//----------------------------------------------------------------
+	// ============================
+	// 1) Inicialização do Canvas
+	// ============================
 	useEffect(() => {
 		if (!canvasRef.current || !isImageUploaded) return;
 
@@ -52,10 +69,16 @@ const CanvasArea: React.FC = () => {
 		});
 		fabricCanvasRef.current = canvas;
 
-		// Configurar o brush
 		canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
-		canvas.freeDrawingBrush.color = brushColor;
-		canvas.freeDrawingBrush.width = brushWidth;
+
+		// Configurar o brush (para quando o componente inicia)
+		console.log(canvas.freeDrawingBrush);
+		if (canvas.freeDrawingBrush) {
+			// se não houver selectedClass, use cor default "#000"
+			const brushColor = selectedClass?.color || "#000000";
+			canvas.freeDrawingBrush.color = brushColor;
+			canvas.freeDrawingBrush.width = brushWidth;
+		}
 
 		// Carregar último estado se existir
 		if (undoStack.current.length > 0) {
@@ -78,54 +101,67 @@ const CanvasArea: React.FC = () => {
 			}
 		};
 		canvas.on("object:modified", saveState);
-		canvas.on("path:created", saveState);
 
-		// Cleanup
+		canvas.on("mouse:down", () => console.log("Mouse down (Fabric)"));
+		canvas.on("mouse:move", () => console.log("Mouse move (Fabric)"));
+		canvas.on("mouse:up", () => console.log("Mouse up (Fabric)"));
+		// Sempre que cria um path (brush), definimos a cor e as "props"
+		canvas.on("path:created", (e) => {
+			const pathObj = e.path;
+			if (selectedClass) {
+				pathObj.set({
+					fill: selectedClass.color,
+					// Se brush é fill, pode ser fill: selectedClass.color,
+				});
+
+				// Armazena info da classe
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				(pathObj as any).data = {
+					classId: selectedClass.id,
+					className: selectedClass.name,
+					classColor: selectedClass.color,
+				};
+			}
+			// Salva estado
+			saveState();
+		});
+
+		// Cleanup ao desmontar
 		return () => {
 			canvas.dispose();
 		};
 	}, [isImageUploaded]);
 
-	//----------------------------------------------------------------
-	// 2) Atualiza cor e largura do brush sempre que mudarem no state
-	//----------------------------------------------------------------
+	// =============================
+	// 2) Atualiza Brush ao mudar selectedClass ou brushWidth
+	// =============================
 	useEffect(() => {
 		const canvas = fabricCanvasRef.current;
 		if (!canvas) return;
-
 		if (canvas.freeDrawingBrush) {
+			// se não houver selectedClass, default "#000"
+			const brushColor = selectedClass?.color || "#000000";
 			canvas.freeDrawingBrush.color = brushColor;
 			canvas.freeDrawingBrush.width = brushWidth;
 		}
-	}, [brushColor, brushWidth]);
+	}, [selectedClass, brushWidth]);
 
-	//----------------------------------------------------------------
-	// 3) MODO POLÍGONO: define localmente a função e faz cleanup
-	//----------------------------------------------------------------
+	// =============================
+	// 3) Modo Polígono
+	// =============================
 	useEffect(() => {
 		const canvas = fabricCanvasRef.current;
 		if (!canvas) return;
 
 		if (isPolygonMode) {
-			// Desativa brush e Eraser
 			canvas.isDrawingMode = false;
-			// Se quiser remover qualquer listener local de eraser
-			// mas aqui, se tiver, a gente pode remover
-
-			// Limpamos polygon inacabado (se quiser) OU deixamos
-			// Se você quiser sempre que ative polígono, comece limpo
 			cancelPolygonDrawing();
 
-			/**
-			 * Função local para clique do polígono
-			 */
 			function handlePolygonLocal(options: fabric.IEvent<MouseEvent>) {
 				if (!canvas) return;
-
 				const pointer = canvas.getPointer(options.e);
 				const zoom = canvas.getZoom();
 
-				// Verifica se clicamos próximo do primeiro ponto
 				if (pointArray.current.length > 0) {
 					const firstCircle = pointArray.current[0];
 					const dx = (firstCircle.left ?? 0) - pointer.x / zoom;
@@ -138,10 +174,10 @@ const CanvasArea: React.FC = () => {
 					}
 				}
 
-				// Cria um círculo (ponto)
+				// Cria o círculo (ponto)
 				const circle = new fabric.Circle({
 					radius: 5,
-					fill: pointArray.current.length === 0 ? "red" : "#ffffff",
+					fill: selectedClass?.color,
 					stroke: "#333333",
 					strokeWidth: 0.5,
 					left: pointer.x / zoom,
@@ -153,7 +189,7 @@ const CanvasArea: React.FC = () => {
 					originY: "center",
 				});
 
-				// Linha que liga ao ponto anterior
+				// Linha
 				const line = new fabric.Line(
 					[
 						pointer.x / zoom,
@@ -171,7 +207,7 @@ const CanvasArea: React.FC = () => {
 					}
 				);
 
-				// Se já existe um polígono temporário
+				// Se já existe polígono temporário
 				if (activeShape.current) {
 					const pos = canvas.getPointer(options.e);
 					const polyPoints = activeShape.current.get("points") || [];
@@ -217,11 +253,9 @@ const CanvasArea: React.FC = () => {
 				canvas.selection = false;
 			}
 
-			/**
-			 * Função local para finalizar o polígono
-			 */
 			function finalizePolygonLocal() {
-				if (!activeShape.current) return;
+				const canvas = fabricCanvasRef.current;
+				if (!canvas || !activeShape.current) return;
 
 				const polyPoints = (activeShape.current.get("points") || []).map(
 					(p) => ({
@@ -243,13 +277,24 @@ const CanvasArea: React.FC = () => {
 				const polygon = new fabric.Polygon(polyPoints, {
 					stroke: "#333333",
 					strokeWidth: 1,
-					fill: brushColor,
+					// Se tiver classe selecionada, use a cor
+					fill: selectedClass?.color || "#000000",
 					opacity: 1,
 					selectable: true,
 					hasBorders: true,
 					hasControls: true,
 					evented: true,
 				});
+
+				// Armazena no data a info da classe
+				if (selectedClass) {
+					polygon.data = {
+						classId: selectedClass.id,
+						className: selectedClass.name,
+						classColor: selectedClass.color,
+					};
+				}
+
 				canvas.add(polygon);
 
 				activeShape.current = null;
@@ -261,32 +306,29 @@ const CanvasArea: React.FC = () => {
 				message.success("Polígono finalizado!");
 			}
 
-			// Anexa o listener local
 			canvas.on("mouse:down", handlePolygonLocal);
 
-			// Cleanup: remove listener e, se quiser, faz algo mais
 			return () => {
 				canvas.off("mouse:down", handlePolygonLocal);
-				// Se desativar polígono, cancela shape inacabado
 				cancelPolygonDrawing();
 			};
 		} else {
-			// Se não estiver no modo polígono, pode reativar brush?
+			const canvas = fabricCanvasRef.current;
+			if (!canvas) return;
 			if (!isEraserMode) {
 				canvas.isDrawingMode = isBrushing;
 			}
 		}
-	}, [isPolygonMode, isBrushing, isEraserMode, brushColor]);
+	}, [isPolygonMode, isBrushing, isEraserMode, selectedClass]);
 
-	//----------------------------------------------------------------
-	// 4) MODO BORRACHA: define localmente a função e faz cleanup
-	//----------------------------------------------------------------
+	// ============================
+	// 4) Modo Borracha
+	// ============================
 	useEffect(() => {
 		const canvas = fabricCanvasRef.current;
 		if (!canvas) return;
 
 		if (isEraserMode) {
-			// Desligar brush e polígono
 			canvas.isDrawingMode = false;
 			cancelPolygonDrawing();
 
@@ -307,20 +349,15 @@ const CanvasArea: React.FC = () => {
 				canvas.off("mouse:down", handleEraserLocal);
 			};
 		} else {
-			// Se sair do modo borracha, volta ao brush/polygon?
 			if (!isPolygonMode) {
 				canvas.isDrawingMode = isBrushing;
 			}
 		}
 	}, [isEraserMode, isPolygonMode, isBrushing]);
 
-	//----------------------------------------------------------------
-	// 5) Funções auxiliares
-	//----------------------------------------------------------------
-
-	/**
-	 * Cancela qualquer polígono em andamento
-	 */
+	// ============================
+	// Funções Auxiliares
+	// ============================
 	function cancelPolygonDrawing() {
 		const canvas = fabricCanvasRef.current;
 		if (!canvas) return;
@@ -340,9 +377,6 @@ const CanvasArea: React.FC = () => {
 		canvas.renderAll();
 	}
 
-	/**
-	 * Salva estado manualmente no undoStack
-	 */
 	function saveStateManualmente() {
 		const canvas = fabricCanvasRef.current;
 		if (!canvas) return;
@@ -357,9 +391,6 @@ const CanvasArea: React.FC = () => {
 		}
 	}
 
-	/**
-	 * Undo
-	 */
 	function undo() {
 		const canvas = fabricCanvasRef.current;
 		if (!canvas) return;
@@ -378,9 +409,9 @@ const CanvasArea: React.FC = () => {
 		}
 	}
 
-	//----------------------------------------------------------------
-	// 6) Upload de Imagem
-	//----------------------------------------------------------------
+	// ============================
+	// Upload de Imagem
+	// ============================
 	function handleImageUpload(file: File) {
 		const reader = new FileReader();
 		reader.onload = (e) => {
@@ -401,9 +432,9 @@ const CanvasArea: React.FC = () => {
 		return false;
 	}
 
-	//----------------------------------------------------------------
-	// 7) Botões: toggles para Brush, Polygon, Eraser
-	//----------------------------------------------------------------
+	// ============================
+	// Botões
+	// ============================
 	function toggleBrushing() {
 		const canvas = fabricCanvasRef.current;
 		if (!canvas) return;
@@ -446,83 +477,204 @@ const CanvasArea: React.FC = () => {
 			canvas.isDrawingMode = false;
 		}
 	}
+	// ----------------------------
+	// buildCOCOJSON, polygonArea etc.
+	// ----------------------------
+	function polygonArea(points: fabric.Point[]) {
+		let area = 0;
+		for (let i = 0; i < points.length; i++) {
+			const j = (i + 1) % points.length;
+			area += points[i].x * points[j].y - points[j].x * points[i].y;
+		}
+		return Math.abs(area / 2);
+	}
 
-	//----------------------------------------------------------------
-	// 8) Render
-	//----------------------------------------------------------------
+	function buildCOCOJSON() {
+		const canvas = fabricCanvasRef.current!;
+		const width = canvas.getWidth();
+		const height = canvas.getHeight();
+
+		const cocoJSON = {
+			info: {
+				description: "Example dataset",
+				url: "http://localhost:5173", // Necessário
+				version: "1.0",
+				year: 2025,
+				contributor: "User",
+				date_created: new Date().toISOString(),
+			},
+			licenses: [
+				{
+					url: "http://opensource.org/licenses/MIT",
+					id: 1,
+					name: "MIT",
+				},
+			],
+			images: [
+				{
+					license: 1,
+					file_name: "uploaded_image.jpg",
+					coco_url: "http://somewhere.com/coco", // OBRIGATÓRIO
+					height,
+					width,
+					date_captured: "2025-01-28", // OBRIGATÓRIO
+					flickr_url: "http://someflickr.com", // OBRIGATÓRIO
+					id: 1,
+				},
+			],
+			annotations: [] as any[],
+			categories: allClasses.map((cls) => ({
+				supercategory: "object", // OBRIGATÓRIO no schema
+				id: cls.id,
+				name: cls.name,
+			})),
+		};
+		let annotationId = 1;
+
+		canvas.getObjects().forEach((obj) => {
+			const catId = (obj as any).data?.classId || 0;
+
+			if (obj.type === "polygon") {
+				const poly = obj as fabric.Polygon;
+				const points = poly.points || [];
+				const segArr: number[] = [];
+				points.forEach((p) => segArr.push(p.x, p.y));
+				const segmentation = [segArr];
+
+				const xs = points.map((p) => p.x);
+				const ys = points.map((p) => p.y);
+				const minX = Math.min(...xs);
+				const maxX = Math.max(...xs);
+				const minY = Math.min(...ys);
+				const maxY = Math.max(...ys);
+				const bbox = [minX, minY, maxX - minX, maxY - minY];
+
+				const area = polygonArea(points);
+
+				cocoJSON.annotations.push({
+					id: annotationId++,
+					image_id: 1,
+					category_id: catId,
+					segmentation,
+					area,
+					bbox,
+					iscrowd: 0,
+				});
+			} else if (obj.type === "path") {
+				const bound = obj.getBoundingRect();
+				const bbox = [bound.left, bound.top, bound.width, bound.height];
+				const area = bound.width * bound.height;
+
+				cocoJSON.annotations.push({
+					id: annotationId++,
+					image_id: 1,
+					category_id: catId,
+					segmentation: [],
+					area,
+					bbox,
+					iscrowd: 0,
+				});
+			}
+		});
+
+		return cocoJSON;
+	}
+
+	function downloadJson(jsonStr: string, filename: string) {
+		const blob = new Blob([jsonStr], { type: "application/json" });
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement("a");
+		link.href = url;
+		link.download = filename;
+		link.click();
+		URL.revokeObjectURL(url);
+	}
+
+	async function exportAndValidateCOCO() {
+		if (!fabricCanvasRef.current) return;
+
+		const cocoJSON = buildCOCOJSON();
+		// Valida no servidor
+		console.log(cocoJSON);
+		const { status, data } = await validateCOCOOnServer(cocoJSON);
+		if (status === 200) {
+			console.log("Validação ok no servidor!");
+			downloadJson(JSON.stringify(cocoJSON, null, 2), "annotations.json");
+		} else {
+			console.error("Validação falhou:", data);
+			message.error("Validação falhou: " + JSON.stringify(data));
+		}
+	}
+
+	// ============================
+	// Render
+	// ============================
 	return (
 		<div
-			id="canvas-div"
 			style={{
-				height: "60%",
+				display: "flex",
+				height: "100%",
 				width: "100%",
-				borderRadius: "20px",
-				position: "relative",
-				backgroundImage: backgroundImage ? `url(${backgroundImage})` : "none",
-				backgroundSize: "cover",
-				backgroundPosition: "center",
-				backgroundRepeat: "no-repeat",
+				justifyContent: "space-between",
 			}}
 		>
-			{!isImageUploaded ? (
-				<Upload beforeUpload={handleImageUpload} showUploadList={false}>
-					<button
-						style={{
-							padding: "10px 20px",
-							backgroundColor: "#5E4AE3",
-							color: "#fff",
-							borderRadius: "8px",
-							border: "none",
-							cursor: "pointer",
-							marginBottom: "10px",
-						}}
-					>
-						<UploadOutlined /> Upload Image
-					</button>
-				</Upload>
-			) : (
-				<>
-					<canvas
-						ref={canvasRef}
-						style={{
-							position: "absolute",
-							top: 0,
-							left: 0,
-							width: "100%",
-							height: "100%",
-						}}
-					/>
-					<div style={{ marginTop: "10px" }}>
-						{/* Configurações de Brush */}
-						<input
-							type="color"
-							value={brushColor}
-							onChange={(e) => setBrushColor(e.target.value)}
+			<div
+				id="canvas-div"
+				style={{
+					height: "100%",
+					width: "90%",
+					borderRadius: "20px",
+					display: "flex",
+					position: "relative",
+					backgroundImage: backgroundImage ? `url(${backgroundImage})` : "none",
+					backgroundSize: "cover",
+					backgroundPosition: "center",
+					backgroundRepeat: "no-repeat",
+				}}
+			>
+				{!isImageUploaded ? (
+					<Upload beforeUpload={handleImageUpload} showUploadList={false}>
+						<button
+							style={{
+								padding: "10px 20px",
+								backgroundColor: "#5E4AE3",
+								color: "#fff",
+								borderRadius: "8px",
+								border: "none",
+								cursor: "pointer",
+								marginBottom: "10px",
+							}}
+						>
+							<UploadOutlined /> Upload Image
+						</button>
+					</Upload>
+				) : (
+					<>
+						<canvas
+							ref={canvasRef}
+							style={{
+								position: "absolute",
+								top: 0,
+								left: 0,
+								width: "100%",
+								height: "100%",
+							}}
 						/>
-						<input
-							type="range"
-							min={1}
-							max={50}
-							value={brushWidth}
-							onChange={(e) => setBrushWidth(Number(e.target.value))}
-						/>
-
-						<button onClick={toggleBrushing}>
-							{isBrushing ? "Disable Brush" : "Enable Brush"}
-						</button>
-
-						<button onClick={togglePolygonMode}>
-							{isPolygonMode ? "Disable Polygon" : "Enable Polygon"}
-						</button>
-
-						<button onClick={toggleEraserMode}>
-							{isEraserMode ? "Disable Eraser" : "Enable Eraser"}
-						</button>
-
-						<button onClick={undo}>Undo</button>
-					</div>
-				</>
-			)}
+					</>
+				)}
+			</div>
+			<ToolBar
+				onToggleBrush={toggleBrushing}
+				onTogglePolygon={togglePolygonMode}
+				onToggleEraser={toggleEraserMode}
+				onUndo={undo}
+				onExport={exportAndValidateCOCO}
+				brushWidth={brushWidth}
+				onBrushWidthChange={(val) => setBrushWidth(val)}
+				isBrushingActive={isBrushing}
+				isPolygonActive={isPolygonMode}
+				isEraserActive={isEraserMode}
+			/>
 		</div>
 	);
 };

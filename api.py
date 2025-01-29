@@ -1,8 +1,10 @@
 from flask import Flask, request, jsonify
 from pydantic import BaseModel, ValidationError
 from typing import List, Union
+from flask_cors import CORS 
 
 app = Flask(__name__)
+CORS(app)  
 
 class Info(BaseModel):
     description: str
