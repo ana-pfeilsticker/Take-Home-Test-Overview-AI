@@ -4,7 +4,6 @@ import Sider from "antd/es/layout/Sider";
 import theme from "./styles/theme";
 import ClassesPanel from "./components/ClassesPanel/ClassesPanel";
 import CanvasArea from "./components/Canvas/CanvasArea";
-import ToolBar from "./components/Toolbar/Toobar";
 import { useState } from "react";
 
 export interface ClassItemInterface {
@@ -13,11 +12,7 @@ export interface ClassItemInterface {
 	color: string;
 }
 function App() {
-	const [classes, setClasses] = useState<ClassItemInterface[]>([
-		{ id: 1, name: "Car", color: "#FFA500" },
-		{ id: 2, name: "Grass", color: "#9370DB" },
-		{ id: 3, name: "Tree", color: "#228B22" },
-	]);
+	const [classes, setClasses] = useState<ClassItemInterface[]>([]);
 	const [selectedClass, setSelectedClass] = useState<ClassItemInterface | null>(
 		null
 	);
