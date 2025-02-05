@@ -73,9 +73,7 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 		canvas.freeDrawingBrush = new fabric.PencilBrush(canvas);
 
 		// Configurar o brush (para quando o componente inicia)
-		console.log(canvas.freeDrawingBrush);
 		if (canvas.freeDrawingBrush) {
-			// se não houver selectedClass, use cor default "#000"
 			const brushColor = selectedClass?.color || "#000000";
 			canvas.freeDrawingBrush.color = brushColor;
 			canvas.freeDrawingBrush.width = brushWidth;
@@ -106,25 +104,26 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 		canvas.on("mouse:down", () => console.log("Mouse down (Fabric)"));
 		canvas.on("mouse:move", () => console.log("Mouse move (Fabric)"));
 		canvas.on("mouse:up", () => console.log("Mouse up (Fabric)"));
-		// Sempre que cria um path (brush), definimos a cor e as "props"
 		canvas.on("path:created", (e) => {
 			const pathObj = e.path;
 			if (selectedClass) {
 				pathObj.set({
-					fill: selectedClass.color,
-					// Se brush é fill, pode ser fill: selectedClass.color,
+					stroke: selectedClass.color,
 				});
 
-				// Armazena info da classe
+				// **Atribuir `data` corretamente**
 				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				(pathObj as any).data = {
 					classId: selectedClass.id,
 					className: selectedClass.name,
 					classColor: selectedClass.color,
 				};
+				console.log(pathObj);
 			}
+
 			// Salva estado
 			saveState();
+			canvas.renderAll();
 		});
 
 		// Cleanup ao desmontar
@@ -132,6 +131,41 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 			canvas.dispose();
 		};
 	}, [isImageUploaded]);
+
+	useEffect(() => {
+		const canvas = fabricCanvasRef.current;
+		if (!canvas) return;
+
+		// Certifique-se de remover o evento anterior antes de adicionar um novo
+		canvas.off("path:created");
+
+		// Adiciona novamente o evento para capturar os desenhos feitos com brush
+		canvas.on("path:created", (e) => {
+			const pathObj = e.path;
+			if (selectedClass) {
+				pathObj.set({
+					stroke: selectedClass.color,
+				});
+
+				// Adicionando os dados ao path
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				(pathObj as any).data = {
+					classId: selectedClass.id,
+					className: selectedClass.name,
+					classColor: selectedClass.color,
+				};
+
+				console.log("Novo brush criado:", pathObj);
+			}
+
+			canvas.renderAll();
+		});
+
+		// Cleanup para evitar múltiplas adições do evento
+		return () => {
+			canvas.off("path:created");
+		};
+	}, [selectedClass, isBrushing]);
 
 	// =============================
 	// 2) Atualiza Brush ao mudar selectedClass ou brushWidth
@@ -170,6 +204,7 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 				// 1) Verifica se há objeto “por baixo” do clique
 				const target = canvas.findTarget(options.e, false);
 				if (target) {
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
 					const objClassId = (target as any).data?.classId;
 					// Se for de outra classe, avisa e interrompe
 					if (objClassId && objClassId !== selectedClass.id) {
@@ -309,7 +344,8 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 
 				// Armazena no data a info da classe
 				if (selectedClass) {
-					polygon.data = {
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					(polygon as any).data = {
 						classId: selectedClass.id,
 						className: selectedClass.name,
 						classColor: selectedClass.color,
@@ -557,6 +593,7 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 					id: 1,
 				},
 			],
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			annotations: [] as any[],
 			categories: allClasses.map((cls) => ({
 				supercategory: "object", // OBRIGATÓRIO no schema
@@ -567,7 +604,10 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({
 		let annotationId = 1;
 
 		canvas.getObjects().forEach((obj) => {
+			console.log(obj);
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const catId = (obj as any).data?.classId || 0;
+			console.log(catId);
 
 			if (obj.type === "polygon") {
 				const poly = obj as fabric.Polygon;
